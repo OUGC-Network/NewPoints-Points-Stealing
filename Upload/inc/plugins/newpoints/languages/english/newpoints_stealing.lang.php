@@ -2,7 +2,7 @@
 /***************************************************************************
  *
  *   NewPoints Points Stealing plugin (/inc/plugins/newpoints/languages/english/newpoints_stealing.php)
- *	Author: Diogo Parrinha
+ *    Author: Diogo Parrinha
  *   Copyright: © 2021 Diogo Parrinha
  *
  *
@@ -11,8 +11,8 @@
  *   Adds a points stealing system to NewPoints.
  *
  ***************************************************************************/
- 
-$l['newpoints_stealing'] = "Points Stealing";
+
+$l['newpoints_stealing'] = 'Points Stealing';
 
 $l['newpoints_stealing_info'] = 'You can try to steal from another member for {1} with a succesful rate of {2}%. There is a possibility that the chosen victim has a Blocker Item purchased from the Shop. You can try to steal a maximum of {3}.';
 $l['newpoints_stealing_points'] = 'Points';
