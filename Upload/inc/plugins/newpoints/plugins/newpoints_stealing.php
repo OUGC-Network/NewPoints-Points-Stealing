@@ -11,10 +11,15 @@
  *
  ***************************************************************************/
 
+use function Newpoints\Core\language_load;
+use function Newpoints\Core\templates_get;
+
 // Disallow direct access to this file for security reasons
 if (!defined('IN_MYBB')) {
     die('Direct initialization of this file is not allowed.<br /><br />Please make sure IN_MYBB is defined.');
 }
+
+global $plugins;
 
 if (!defined('IN_ADMINCP')) {
     $plugins->add_hook('newpoints_start', 'newpoints_stealing_page');
@@ -29,7 +34,7 @@ function newpoints_stealing_info()
         'description' => 'Adds a points stealing system to NewPoints.',
         'author' => 'Diogo Parrinha',
         'version' => '1.1',
-        'compatibility' => '2*'
+        'compatibility' => '31*'
     ];
 }
 
@@ -37,11 +42,13 @@ function newpoints_stealing_install()
 {
     global $db;
 
+    language_load('stealing');
+
     // add settings
     $disporder = 0;
     newpoints_add_setting(
         'newpoints_stealing_cost',
-        'newpoints_stealing',
+        'stealing',
         'Cost',
         'How many points do users have to spend to steal from another user?',
         'text',
@@ -50,7 +57,7 @@ function newpoints_stealing_install()
     );
     newpoints_add_setting(
         'newpoints_stealing_chance',
-        'newpoints_stealing',
+        'stealing',
         'Chance',
         'What is the chance, out of a 100, that a stealing try is successful?',
         'text',
@@ -59,7 +66,7 @@ function newpoints_stealing_install()
     );
     newpoints_add_setting(
         'newpoints_stealing_blocker',
-        'newpoints_stealing',
+        'stealing',
         'Blocker Item',
         'Enter the item ID of the Shop item that allows users to block other users from blocking them.',
         'text',
@@ -68,7 +75,7 @@ function newpoints_stealing_install()
     );
     newpoints_add_setting(
         'newpoints_stealing_sendpm',
-        'newpoints_stealing',
+        'stealing',
         'Send PM Alerts',
         'Select whether or not PM alerts are sent. The content of the PMs can be changed in the language files.',
         'yesno',
@@ -77,7 +84,7 @@ function newpoints_stealing_install()
     );
     newpoints_add_setting(
         'newpoints_stealing_laststealers',
-        'newpoints_stealing',
+        'stealing',
         'Last Stealers',
         'Enter how many last stealers are displayed in the statistics.',
         'text',
@@ -86,7 +93,7 @@ function newpoints_stealing_install()
     );
     newpoints_add_setting(
         'newpoints_stealing_flood',
-        'newpoints_stealing',
+        'stealing',
         'Flood Check',
         'Enter how many seconds must pass before a user can steal again.',
         'text',
@@ -95,7 +102,7 @@ function newpoints_stealing_install()
     );
     newpoints_add_setting(
         'newpoints_stealing_maxpoints',
-        'newpoints_stealing',
+        'stealing',
         'Maximum Points',
         'Enter how many points users can try to steal from other users. Leave empty to disable the maximum.',
         'text',
@@ -134,6 +141,14 @@ function newpoints_stealing_uninstall()
 function newpoints_stealing_activate()
 {
     global $db, $mybb;
+
+    global $db;
+
+    $query = $db->simple_select('newpoints_settings', 'sid', "plugin='newpoints_stealing'");
+
+    while ($setting = $db->fetch_array($query)) {
+        $db->update_query('newpoints_settings', ['plugin' => 'stealing'], "sid='{$setting['sid']}'");
+    }
 
     newpoints_add_template(
         'newpoints_stealing',
@@ -292,11 +307,10 @@ function newpoints_stealing_menu(&$menu)
     global $mybb, $lang;
     newpoints_lang_load('newpoints_stealing');
 
-    if ($mybb->input['action'] == 'stealing') {
-        $menu[] = "&raquo; <a href=\"{$mybb->settings['bburl']}/newpoints.php?action=stealing\">" . $lang->newpoints_stealing . '</a>';
-    } else {
-        $menu[] = "<a href=\"{$mybb->settings['bburl']}/newpoints.php?action=stealing\">" . $lang->newpoints_stealing . '</a>';
-    }
+    $menu[] = [
+        'action' => 'stealing',
+        'lang_string' => 'newpoints_stealing'
+    ];
 }
 
 function newpoints_stealing_page()
@@ -306,6 +320,8 @@ function newpoints_stealing_page()
     if ($mybb->input['action'] != 'stealing') {
         return;
     }
+
+    $stealing = '';
 
     if (!$mybb->user['uid']) {
         error_no_permission();
@@ -331,7 +347,7 @@ function newpoints_stealing_page()
             ['order_by' => 'date', 'order_dir' => 'DESC', 'limit' => 1]
         );
         $log = $db->fetch_array($q);
-        if ($log['date'] > (TIME_NOW - (int)$mybb->settings['newpoints_stealing_flood'])) {
+        if (!empty($log) && $log['date'] > (TIME_NOW - (int)$mybb->settings['newpoints_stealing_flood'])) {
             error(
                 $lang->sprintf(
                     $lang->newpoints_stealing_flood,
@@ -341,7 +357,7 @@ function newpoints_stealing_page()
         }
 
         // Validate points maximum
-        if ((int)$mybb->settings['newpoints_stealing_maxpoints'] != 0) {
+        if ((float)$mybb->settings['newpoints_stealing_maxpoints'] != 0) {
             if ((float)$mybb->input['points'] > (float)$mybb->settings['newpoints_stealing_maxpoints']) {
                 error($lang->newpoints_stealing_over_maxpoints);
             }
@@ -495,12 +511,9 @@ function newpoints_stealing_page()
         newpoints_format_points($mybb->settings['newpoints_stealing_maxpoints'])
     );
 
-    eval("\$page = \"" . $templates->get('newpoints_stealing') . "\";");
-
     // output page
-    output_page($page);
+    output_page(eval(templates_get('stealing')));
 }
-
 
 function newpoints_stealing_stats()
 {
@@ -549,6 +562,3 @@ function newpoints_stealing_stats()
 
     eval("\$newpoints_stealing_stats = \"" . $templates->get('newpoints_stealing_stats') . "\";");
 }
-
-
-?>
