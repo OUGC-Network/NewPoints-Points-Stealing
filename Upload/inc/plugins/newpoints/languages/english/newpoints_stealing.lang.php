@@ -54,5 +54,3 @@ $l['newpoints_stealing_pm_failed_message'] = 'Great! {1} tried to steal {2} from
 
 $l['newpoints_stealing_own_points'] = 'You do not have enough points.';
 $l['newpoints_stealing_invalid_points'] = 'You must enter a valid amount of points.';
-
-?>

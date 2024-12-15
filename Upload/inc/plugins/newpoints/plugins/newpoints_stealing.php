@@ -33,9 +33,10 @@ function newpoints_stealing_info()
         'name' => 'Points Stealing',
         'description' => 'Adds a points stealing system to NewPoints.',
         'author' => 'Diogo Parrinha',
-        'version' => '3.1',
+        'version' => '3.1.0',
         'versioncode' => '3100',
-        'compatibility' => '31*'
+        'compatibility' => '31*',
+        'codename' => 'newpoints_points_stealing',
     ];
 }
 
@@ -208,8 +209,7 @@ function newpoints_stealing_activate()
 			MyBB.select2();
 			$("#username").select2({
 				placeholder: "{$lang->search_user}",
-				minimumInputLength: 3,
-				maximumSelectionSize: 3,
+				minimumInputLength: 2,
 				multiple: false,
 				ajax: { // instead of writing the function to execute the request we use Select2\'s convenient helper
 					url: "xmlhttp.php?action=get_users",
