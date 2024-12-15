@@ -33,7 +33,8 @@ function newpoints_stealing_info()
         'name' => 'Points Stealing',
         'description' => 'Adds a points stealing system to NewPoints.',
         'author' => 'Diogo Parrinha',
-        'version' => '1.1',
+        'version' => '3.1',
+        'versioncode' => '3100',
         'compatibility' => '31*'
     ];
 }
