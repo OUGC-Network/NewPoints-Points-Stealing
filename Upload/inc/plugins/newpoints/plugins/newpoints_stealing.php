@@ -12,7 +12,13 @@
  ***************************************************************************/
 
 use function Newpoints\Core\language_load;
+use function Newpoints\Core\log_add;
+use function Newpoints\Core\points_add_simple;
+use function Newpoints\Core\points_subtract;
 use function Newpoints\Core\templates_get;
+
+use const Newpoints\Core\LOGGING_TYPE_CHARGE;
+use const Newpoints\Core\LOGGING_TYPE_INCOME;
 
 // Disallow direct access to this file for security reasons
 if (!defined('IN_MYBB')) {
@@ -137,7 +143,7 @@ function newpoints_stealing_uninstall()
     );
     rebuild_settings();
 
-    newpoints_remove_log(['stealing_stole']);
+    newpoints_remove_log(['stealing_stole', 'stealing_blocked', 'stealing_failed', 'stealing_stolen_user']);
 }
 
 function newpoints_stealing_activate()
@@ -334,8 +340,7 @@ function newpoints_stealing_page()
         verify_post_check($mybb->input['my_post_key']);
 
         // Check points
-        $mybb->input['points'] = (float)$mybb->input['points'];
-        /*if($mybb->input['points'] > (float)$mybb->user['newpoints'])
+        /*if($mybb->get_input('points', \MyBB::INPUT_FLOAT) > (float)$mybb->user['newpoints'])
         {
             error($lang->newpoints_stealing_not_enough_points);
         }*/
@@ -344,7 +349,7 @@ function newpoints_stealing_page()
         $q = $db->simple_select(
             'newpoints_log',
             '*',
-            '(action=\'stealing_stole\' OR action=\'stealing_failed\' OR action=\'stealing_blocked\') AND uid=' . (int)$mybb->user['uid'],
+            '(action=\'stealing_stole\' OR action=\'stealing_failed\' OR action=\'stealing_blocked\' OR \'stealing_stolen_user\') AND uid=' . (int)$mybb->user['uid'],
             ['order_by' => 'date', 'order_dir' => 'DESC', 'limit' => 1]
         );
         $log = $db->fetch_array($q);
@@ -359,12 +364,15 @@ function newpoints_stealing_page()
 
         // Validate points maximum
         if ((float)$mybb->settings['newpoints_stealing_maxpoints'] != 0) {
-            if ((float)$mybb->input['points'] > (float)$mybb->settings['newpoints_stealing_maxpoints']) {
+            if ((float)$mybb->get_input(
+                    'points',
+                    MyBB::INPUT_FLOAT
+                ) > (float)$mybb->settings['newpoints_stealing_maxpoints']) {
                 error($lang->newpoints_stealing_over_maxpoints);
             }
         }
 
-        if ((float)$mybb->input['points'] <= 0) {
+        if ((float)$mybb->get_input('points', MyBB::INPUT_FLOAT) <= 0) {
             error($lang->newpoints_stealing_invalid_points);
         }
 
@@ -388,7 +396,7 @@ function newpoints_stealing_page()
         }
 
         // Does the victim have enough points?
-        if ((float)$mybb->input['points'] > (float)$user['newpoints']) {
+        if ((float)$mybb->get_input('points', MyBB::INPUT_FLOAT) > (float)$user['newpoints']) {
             error($lang->newpoints_stealing_victim_points);
         }
 
@@ -414,21 +422,20 @@ function newpoints_stealing_page()
                         'message' => $lang->sprintf(
                             $lang->newpoints_stealing_pm_blocked_message,
                             $mybb->user['username'],
-                            newpoints_format_points($mybb->input['points'])
+                            newpoints_format_points($mybb->get_input('points', MyBB::INPUT_FLOAT))
                         ),
                         'touid' => (int)$user['uid'],
                         'receivepms' => 1
                     ], 0, true);
 
                     // Log
-                    newpoints_log(
+                    log_add(
                         'stealing_blocked',
-                        $lang->sprintf(
-                            $lang->newpoints_stealing_blocked_log,
-                            $user['uid'],
-                            $mybb->input['points'],
-                            $mybb->settings['newpoints_stealing_cost']
-                        )
+                        '',
+                        $mybb->user['username'] ?? '',
+                        (int)$mybb->user['uid'],
+                        (float)$mybb->get_input('points', MyBB::INPUT_FLOAT),
+                        (int)$user['uid']
                     );
 
                     error($lang->newpoints_stealing_blocked);
@@ -437,7 +444,10 @@ function newpoints_stealing_page()
         }
 
         // Get money from user
-        newpoints_addpoints($mybb->user['uid'], -(floatval($mybb->settings['newpoints_stealing_cost'])));
+        points_subtract(
+            (int)$mybb->user['uid'],
+            (float)$mybb->settings['newpoints_stealing_cost']
+        );
 
         // Successful? Get points from victim
         $r = mt_rand(1, 100);
@@ -447,29 +457,35 @@ function newpoints_stealing_page()
                 'message' => $lang->sprintf(
                     $lang->newpoints_stealing_pm_failed_message,
                     $mybb->user['username'],
-                    newpoints_format_points($mybb->input['points'])
+                    newpoints_format_points($mybb->get_input('points', MyBB::INPUT_FLOAT))
                 ),
                 'touid' => (int)$user['uid'],
                 'receivepms' => 1
             ], 0, true);
 
             // Log
-            newpoints_log(
+            log_add(
                 'stealing_failed',
-                $lang->sprintf(
-                    $lang->newpoints_stealing_failed_log,
-                    $user['uid'],
-                    $mybb->input['points'],
-                    $mybb->settings['newpoints_stealing_cost']
-                )
+                '',
+                $mybb->user['username'] ?? '',
+                (int)$mybb->user['uid'],
+                (float)$mybb->get_input('points', MyBB::INPUT_FLOAT),
+                (int)$user['uid']
             );
 
             error($lang->newpoints_stealing_failed);
         }
 
         // Success
-        newpoints_addpoints($user['uid'], -(floatval($mybb->input['points'])));
-        newpoints_addpoints($mybb->user['uid'], (floatval($mybb->input['points'])));
+        points_subtract(
+            (int)$user['uid'],
+            $mybb->get_input('points', MyBB::INPUT_FLOAT)
+        );
+
+        points_add_simple(
+            (int)$mybb->user['uid'],
+            $mybb->get_input('points', MyBB::INPUT_FLOAT)
+        );
 
         // Send PM
         send_pm([
@@ -477,28 +493,42 @@ function newpoints_stealing_page()
             'message' => $lang->sprintf(
                 $lang->newpoints_stealing_pm_stolen_message,
                 $mybb->user['username'],
-                newpoints_format_points($mybb->input['points'])
+                newpoints_format_points($mybb->get_input('points', MyBB::INPUT_FLOAT))
             ),
             'touid' => (int)$user['uid'],
             'receivepms' => 1
         ], 0, true);
 
         // Log
-        newpoints_log(
+        log_add(
+            'stealing_stolen_user',
+            '',
+            $user['username'] ?? '',
+            (int)$user['uid'],
+            (float)$mybb->get_input('points', MyBB::INPUT_FLOAT),
+            (int)$mybb->user['uid'],
+            0,
+            0,
+            LOGGING_TYPE_CHARGE
+        );
+
+        log_add(
             'stealing_stole',
-            $lang->sprintf(
-                $lang->newpoints_stealing_stole_log,
-                $user['uid'],
-                $mybb->input['points'],
-                $mybb->settings['newpoints_stealing_cost']
-            )
+            '',
+            $mybb->user['username'] ?? '',
+            (int)$mybb->user['uid'],
+            (float)$mybb->get_input('points', MyBB::INPUT_FLOAT),
+            (int)$user['uid'],
+            0,
+            0,
+            LOGGING_TYPE_INCOME
         );
 
         //redirect($mybb->settings['bburl']."/newpoints.php?action=stealing", $lang->newpoints_stealing_redirect);
         error(
             $lang->sprintf(
                 $lang->newpoints_stealing_success,
-                newpoints_format_points((float)$mybb->input['points']),
+                newpoints_format_points((float)$mybb->get_input('points', MyBB::INPUT_FLOAT)),
                 htmlspecialchars_uni($user['username'])
             ),
             $lang->newpoints_stealing_success_title
@@ -562,4 +592,72 @@ function newpoints_stealing_stats()
     }
 
     eval("\$newpoints_stealing_stats = \"" . $templates->get('newpoints_stealing_stats') . "\";");
+}
+
+$plugins->add_hook('newpoints_logs_log_row', 'newpoints_stealing_logs_log_row');
+function newpoints_stealing_logs_log_row()
+{
+    global $lang;
+    global $log_data, $log_action, $log_primary, $log_secondary;
+
+    newpoints_lang_load('newpoints_stealing');
+
+    switch ($log_data['action']) {
+        case 'stealing_failed':
+        case 'stealing_stole':
+        case 'stealing_stolen_user':
+        case 'stealing_blocked':
+            if (!empty($log_data['log_primary_id'])) {
+                $donation_user_data = get_user($log_data['log_primary_id']);
+
+                $log_primary = build_profile_link(
+                    htmlspecialchars_uni($donation_user_data['username'] ?? ''),
+                    $donation_user_data['uid'] ?? 0
+                );
+            }
+            break;
+    }
+
+    if ($log_data['action'] === 'stealing_failed') {
+        $log_action = $lang->newpoints_stealing_logging_failed;
+    }
+
+    if ($log_data['action'] === 'stealing_stole') {
+        $log_action = $lang->newpoints_stealing_logging_stole;
+    }
+
+    if ($log_data['action'] === 'stealing_stolen_user') {
+        $log_action = $lang->newpoints_stealing_logging_stolen_user;
+    }
+
+    if ($log_data['action'] === 'stealing_blocked') {
+        $log_action = $lang->newpoints_stealing_logging_blocked;
+    }
+}
+
+$plugins->add_hook('newpoints_logs_end', 'newpoints_stealing_logs_end');
+function newpoints_stealing_logs_end()
+{
+    global $lang;
+    global $action_types;
+
+    newpoints_lang_load('newpoints_stealing');
+
+    foreach ($action_types as $action_key => &$action_value) {
+        if ($action_key === 'stealing_failed') {
+            $action_value = $lang->newpoints_stealing_logging_failed;
+        }
+
+        if ($action_key === 'stealing_stole') {
+            $action_value = $lang->newpoints_stealing_logging_stole;
+        }
+
+        if ($action_key === 'stealing_stolen_user') {
+            $action_value = $lang->newpoints_stealing_logging_stolen_user;
+        }
+
+        if ($action_key === 'stealing_blocked') {
+            $action_value = $lang->newpoints_stealing_logging_blocked;
+        }
+    }
 }
