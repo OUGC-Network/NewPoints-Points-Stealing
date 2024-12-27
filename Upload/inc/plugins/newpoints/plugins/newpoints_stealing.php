@@ -528,7 +528,7 @@ function newpoints_stealing_page()
         error(
             $lang->sprintf(
                 $lang->newpoints_stealing_success,
-                newpoints_format_points((float)$mybb->get_input('points', MyBB::INPUT_FLOAT)),
+                newpoints_format_points($mybb->get_input('points', MyBB::INPUT_FLOAT)),
                 htmlspecialchars_uni($user['username'])
             ),
             $lang->newpoints_stealing_success_title
@@ -537,9 +537,9 @@ function newpoints_stealing_page()
 
     $lang->newpoints_stealing_info = $lang->sprintf(
         $lang->newpoints_stealing_info,
-        newpoints_format_points($mybb->settings['newpoints_stealing_cost']),
+        newpoints_format_points((float)$mybb->settings['newpoints_stealing_cost']),
         number_format($mybb->settings['newpoints_stealing_chance'], 2),
-        newpoints_format_points($mybb->settings['newpoints_stealing_maxpoints'])
+        newpoints_format_points((float)$mybb->settings['newpoints_stealing_maxpoints'])
     );
 
     // output page
@@ -579,7 +579,7 @@ function newpoints_stealing_stats()
         $row['victim'] = build_profile_link(htmlspecialchars_uni($victim), intval($data[0]));
 
         // Amount
-        $row['amount'] = newpoints_format_points($data[1]);
+        $row['amount'] = isset($data[1]) ? newpoints_format_points((float)$data[1]) : 0;
 
         // Date
         $row['date'] = my_date($mybb->settings['dateformat'], intval($row['date']), '', false);
