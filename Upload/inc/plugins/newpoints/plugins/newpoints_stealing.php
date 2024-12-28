@@ -579,7 +579,7 @@ function newpoints_stealing_stats()
         $row['victim'] = build_profile_link(htmlspecialchars_uni($victim), intval($data[0]));
 
         // Amount
-        $row['amount'] = isset($data[1]) ? newpoints_format_points((float)$data[1]) : 0;
+        $row['amount'] = newpoints_format_points((float)($row['log_primary_id'] ?? ($data[1] ?? 0)));
 
         // Date
         $row['date'] = my_date($mybb->settings['dateformat'], intval($row['date']), '', false);
