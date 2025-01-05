@@ -661,3 +661,36 @@ function newpoints_stealing_logs_end()
         }
     }
 }
+
+$plugins->add_hook('fetch_wol_activity_end', 'newpoints_stealing_fetch_wol_activity_end');
+function newpoints_stealing_fetch_wol_activity_end(array &$hook_parameters): array
+{
+    if (my_strpos($hook_parameters['location'], \Newpoints\Core\main_file_name()) === false ||
+        my_strpos($hook_parameters['location'], 'action=stealing') === false) {
+        return $hook_parameters;
+    }
+
+    $hook_parameters['activity'] = 'newpoints_newpoints_stealing';
+
+    return $hook_parameters;
+}
+
+$plugins->add_hook('build_friendly_wol_location_end', 'newpoints_stealing_build_friendly_wol_location_end');
+function newpoints_stealing_build_friendly_wol_location_end(array &$hook_parameters): array
+{
+    global $mybb, $lang;
+
+    language_load('newpoints_stealing');
+
+    switch ($hook_parameters['user_activity']['activity']) {
+        case 'newpoints_newpoints_stealing':
+            $hook_parameters['location_name'] = $lang->sprintf(
+                $lang->newpoints_stealing_wol_location,
+                $mybb->settings['bburl'],
+                \Newpoints\Core\url_handler_build(['action' => 'stealing'])
+            );
+            break;
+    }
+
+    return $hook_parameters;
+}
